@@ -1,0 +1,6 @@
+nonlinearity: relu #[relu, tanh]
+ninp: 32
+nhid: 32
+nlayer: 3
+dropout: 0.5
+tie_weights: False
