@@ -5,6 +5,7 @@ import datasets
 import yaml
 import torch.nn as nn
 from tqdm import tqdm
+import pandas as pd
 
 import config_env
 import data
@@ -13,14 +14,16 @@ from model import RNN_nlp
 
 
 def train(model, train_data, criterion, optimize, num_epochs=5, **train_params):
-    batch_size = train_params.get("batch_size", train_data.size(0))
+    batch_size = train_params.get("batch_size", train_data.size(1))
     n_token = train_params.get("n_token", model.decoder.out_features)
     stride = train_params.get("stride", 32)
-    log_interval = train_params.get("log_interval", 500)
+    log_interval = train_params.get("log_interval", int(int(len(train_data) / stride) / 10))
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Device used: {device}")
     model = model.to(device)
+
+    df_log = pd.DataFrame()
 
     model.train()
     for epoch in range(num_epochs):
@@ -39,10 +42,21 @@ def train(model, train_data, criterion, optimize, num_epochs=5, **train_params):
 
             model.zero_grad()
             hidden = hidden.detach()
-
             outputs, hidden = model(inputs, hidden)
             loss = criterion(outputs.view(-1, n_token), target.view(-1))
-
+            df_log = pd.concat(
+                [
+                    df_log,
+                    pd.DataFrame(
+                        {
+                            "epoch": [epoch],
+                            "batch": [batch],
+                            "loss": [loss.item()],
+                            "ppl": [torch.exp(loss).item()]
+                        }
+                    )
+                ]
+            )
             if batch % log_interval == 0:
                 elapsed = time.time() - start_time
                 print(
@@ -54,9 +68,12 @@ def train(model, train_data, criterion, optimize, num_epochs=5, **train_params):
             loss.backward()
             optimize.step()
             optimize.zero_grad()
+    
+    if not os.path.exists(os.path.join(config_env.ROOT_PATH, "result/rnn")):
+        os.makedirs(os.path.join(config_env.ROOT_PATH, "result/rnn"))
+    df_log.to_csv(os.path.join(config_env.ROOT_PATH, "result/rnn/log.csv"))
 
-
-if __name__ == "__main__":
+def run():
     # Download dataset
     if os.path.exists(os.path.join(config_env.ROOT_PATH, "data/wikitext-103/")):
         print("Data exited")
@@ -108,7 +125,8 @@ if __name__ == "__main__":
 
     train_params = {
         "criterion": nn.CrossEntropyLoss(),
-        "optimizer": torch.optim.SGD(model.parameters(), lr=float(train_params["lr"])),
+        "optimize": torch.optim.SGD(model.parameters(), lr=float(train_params["lr"])),
         "n_token": corpus.vocab_size,
     }
-    train(**train_params)
+
+    train(model=model, train_data=train_data, **train_params)
