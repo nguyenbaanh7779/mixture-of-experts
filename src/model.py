@@ -36,6 +36,11 @@ class RNN_nlp(nn.Module):
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, input, hidden):
+        """
+        Args:
+            - input: tensor(stride, bsz)
+            - hidden: tnssor(nlays, bsz, ninp)
+        """
         emb = self.drop(self.encoder(input))
         output, hidden = self.rnn(emb, hidden)
         output = self.drop(output)

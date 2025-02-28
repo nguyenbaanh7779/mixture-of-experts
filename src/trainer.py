@@ -17,7 +17,7 @@ def train(model, train_data, criterion, optimize, num_epochs=5, **train_params):
     batch_size = train_params.get("batch_size", train_data.size(1))
     n_token = train_params.get("n_token", model.decoder.out_features)
     stride = train_params.get("stride", 32)
-    log_interval = train_params.get("log_interval", int(int(len(train_data) / stride) / 10))
+    log_interval = int(int(len(train_data) / stride) / 10)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Device used: {device}")
@@ -73,6 +73,7 @@ def train(model, train_data, criterion, optimize, num_epochs=5, **train_params):
         os.makedirs(os.path.join(config_env.ROOT_PATH, "result/rnn"))
     df_log.to_csv(os.path.join(config_env.ROOT_PATH, "result/rnn/log.csv"))
 
+
 def run():
     # Download dataset
     if os.path.exists(os.path.join(config_env.ROOT_PATH, "data/wikitext-103/")):
@@ -123,10 +124,11 @@ def run():
     model_params["ntoken"] = corpus.vocab_size
     model = RNN_nlp(**model_params)
 
-    train_params = {
-        "criterion": nn.CrossEntropyLoss(),
-        "optimize": torch.optim.SGD(model.parameters(), lr=float(train_params["lr"])),
-        "n_token": corpus.vocab_size,
-    }
-
+    train_params.update(
+        {
+            "criterion": nn.CrossEntropyLoss(),
+            "optimize": torch.optim.SGD(model.parameters(), lr=float(train_params["lr"])),
+            "n_token": corpus.vocab_size,
+        } 
+    )
     train(model=model, train_data=train_data, **train_params)
